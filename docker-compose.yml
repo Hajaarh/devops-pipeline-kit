@@ -1,0 +1,107 @@
+
+#######################
+# Réseau dédié
+#######################
+networks:
+  elt_net:
+
+#######################
+# Services
+#######################
+services:
+##############################################################################
+# 1) PostgreSQL – base cible de l’ELT
+##############################################################################
+  postgres:
+    image: postgres:15
+    container_name: elt_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: Europe/Paris
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    ports:
+      - "5432:5432"    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [elt_net]
+
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: elt_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks: [elt_net]
+
+
+##############################################################################
+# 2) pipeline – micro-service Python (Kaggle + API incrémental)
+##############################################################################
+  pipeline:
+    build: ./pipeline           # Dockerfile dans ./pipeline
+    container_name: elt_pipeline
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      PG_DSN: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      API_URL: ${API_URL}
+      API_KEY: ${API_KEY}
+      KAGGLE_USERNAME: ${KAGGLE_USERNAME}
+      KAGGLE_KEY: ${KAGGLE_KEY}
+      DATASET: syedanwarafidi/vehicle-sales-data
+      SYNC_INTERVAL: ${SYNC_INTERVAL:-900}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./datasets:/datasets                   # CSV Kaggle
+      - ./pipeline/state:/app/state          # curseur incrémental
+    networks: [elt_net]
+
+##############################################################################
+# 3) n8n – orchestration / monitoring visuel
+##############################################################################
+  n8n:
+    image: n8nio/n8n:1.26.0
+    container_name: elt_n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      GENERIC_TIMEZONE: Europe/Paris
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: postgres
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_KEY:-mastarkey}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks: [elt_net]
+
+#######################
+# Volumes
+#######################
+volumes:
+  pgdata:
+  n8n_data:
+  pgadmin_data:
