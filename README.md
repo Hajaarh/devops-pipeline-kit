@@ -166,7 +166,7 @@ docker logs elt_pipeline           # Voir les logs du microservice
 
 ## Avantages de l'architecture 
 
-* Projet a une double orchestration python gère le workflow interne & n8n gère la grande orchestration.
+* Projet à double orchestration python gère le workflow interne & n8n gère la grande orchestration.
 * Modularité  : chaque composant est indépendant (microservices).
 * Reproductibilité : tout peut être relancé avec une seule commande docker compose up.
 * Scalabilité : Enrichir facilement la pipeline avec d’autres étapes ou traitements.
