@@ -49,8 +49,6 @@ Créer un fichier `.env` à la racine avec :
 POSTGRES_PASSWORD=****
 POSTGRES_DB=nom_serveur
 API_URL=http://api
-KAGGLE_USERNAME=xxx
-KAGGLE_KEY=xxx
 SYNC_INTERVAL=900
 ```
 
